@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Documented Maven installation instructions in the README.
+
 ## 1.0.0 - 2026-07-09
 
 - Added the initial `SpliceList<E>` implementation, a mutable sequential list
