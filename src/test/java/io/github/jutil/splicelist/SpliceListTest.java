@@ -2,12 +2,14 @@ package io.github.jutil.splicelist;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -90,6 +92,19 @@ class SpliceListTest {
     }
 
     @Test
+    void listIteratorAtSizeTraversesBackward() {
+        SpliceList<String> list = SpliceList.of("a", "b", "c");
+        ListIterator<String> iterator = list.listIterator(list.size());
+
+        assertFalse(iterator.hasNext());
+        assertTrue(iterator.hasPrevious());
+        assertEquals("c", iterator.previous());
+        assertEquals("b", iterator.previous());
+        assertEquals("a", iterator.previous());
+        assertFalse(iterator.hasPrevious());
+    }
+
+    @Test
     void listIteratorSupportsAddRemoveAndSet() {
         SpliceList<String> list = SpliceList.of("a", "c");
         ListIterator<String> iterator = list.listIterator();
@@ -101,6 +116,20 @@ class SpliceListTest {
         iterator.remove();
 
         assertEquals(Arrays.asList("A", "b"), list);
+        assertEquals(2, iterator.nextIndex());
+        assertEquals(1, iterator.previousIndex());
+    }
+
+    @Test
+    void iteratorRemoveAfterPreviousRemovesReturnedElement() {
+        SpliceList<String> list = SpliceList.of("a", "b", "c");
+        ListIterator<String> iterator = list.listIterator(list.size());
+
+        assertEquals("c", iterator.previous());
+        iterator.remove();
+
+        assertEquals(Arrays.asList("a", "b"), list);
+        assertFalse(iterator.hasNext());
         assertEquals(2, iterator.nextIndex());
         assertEquals(1, iterator.previousIndex());
     }
@@ -147,9 +176,66 @@ class SpliceListTest {
     }
 
     @Test
+    void clearRemovesAllElements() {
+        SpliceList<String> list = SpliceList.of("a", "b", "c");
+
+        list.clear();
+
+        assertTrue(list.isEmpty());
+        assertEquals(0, list.size());
+        assertFalse(list.iterator().hasNext());
+        list.addLast("d");
+        assertEquals(Arrays.asList("d"), list);
+    }
+
+    @Test
+    void containsFindsPresentElementsAndNulls() {
+        SpliceList<String> list = SpliceList.of("a", null, "c");
+
+        assertTrue(list.contains("a"));
+        assertTrue(list.contains(null));
+        assertFalse(list.contains("b"));
+    }
+
+    @Test
+    void toArrayReturnsElementsInOrder() {
+        SpliceList<String> list = SpliceList.of("a", "b", "c");
+
+        assertArrayEquals(new Object[] {"a", "b", "c"}, list.toArray());
+        assertArrayEquals(new String[] {"a", "b", "c"}, list.toArray(new String[0]));
+    }
+
+    @Test
+    void equalsUsesListOrderAndElements() {
+        SpliceList<String> list = SpliceList.of("a", "b", "c");
+
+        assertEquals(Arrays.asList("a", "b", "c"), list);
+        assertEquals(list, Arrays.asList("a", "b", "c"));
+        assertFalse(list.equals(Arrays.asList("a", "c", "b")));
+    }
+
+    @Test
+    void hashCodeMatchesEquivalentList() {
+        SpliceList<String> list = SpliceList.of("a", "b", "c");
+
+        assertEquals(Arrays.asList("a", "b", "c").hashCode(), list.hashCode());
+    }
+
+    @Test
     void addAllIsNonDestructive() {
         SpliceList<String> target = SpliceList.of("a");
         SpliceList<String> source = SpliceList.of("b", "c");
+
+        assertTrue(target.addAll(source));
+
+        assertEquals(Arrays.asList("a", "b", "c"), target);
+        assertEquals(Arrays.asList("b", "c"), source);
+    }
+
+    @Test
+    void addAllFromArrayListIsNonDestructive() {
+        SpliceList<String> target = SpliceList.of("a");
+        ArrayList<String> source = new ArrayList<String>(Arrays.asList("b", "c"));
 
         assertTrue(target.addAll(source));
 
@@ -245,12 +331,45 @@ class SpliceListTest {
     }
 
     @Test
+    void targetIteratorFailsFastAfterSpliceTailModifiesTarget() {
+        SpliceList<String> target = SpliceList.of("a");
+        SpliceList<String> source = SpliceList.of("b");
+        Iterator<String> iterator = target.iterator();
+
+        target.spliceTail(source);
+
+        assertThrows(ConcurrentModificationException.class, iterator::next);
+    }
+
+    @Test
+    void targetIteratorFailsFastAfterSpliceHeadModifiesTarget() {
+        SpliceList<String> target = SpliceList.of("b");
+        SpliceList<String> source = SpliceList.of("a");
+        Iterator<String> iterator = target.iterator();
+
+        target.spliceHead(source);
+
+        assertThrows(ConcurrentModificationException.class, iterator::next);
+    }
+
+    @Test
     void sourceIteratorFailsFastAfterSpliceEmptiesSource() {
         SpliceList<String> target = SpliceList.of("a");
         SpliceList<String> source = SpliceList.of("b");
         Iterator<String> iterator = source.iterator();
 
         target.spliceTail(source);
+
+        assertThrows(ConcurrentModificationException.class, iterator::next);
+    }
+
+    @Test
+    void sourceIteratorFailsFastAfterSpliceHeadEmptiesSource() {
+        SpliceList<String> target = SpliceList.of("b");
+        SpliceList<String> source = SpliceList.of("a");
+        Iterator<String> iterator = source.iterator();
+
+        target.spliceHead(source);
 
         assertThrows(ConcurrentModificationException.class, iterator::next);
     }

@@ -10,7 +10,7 @@ import java.util.Objects;
  *
  * @param <E> the element type
  */
-public class SpliceList<E> extends AbstractSequentialList<E> {
+public final class SpliceList<E> extends AbstractSequentialList<E> {
     private Node<E> first;
     private Node<E> last;
     private int size;
