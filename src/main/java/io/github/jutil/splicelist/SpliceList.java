@@ -6,7 +6,17 @@ import java.util.NoSuchElementException;
 import java.util.Objects;
 
 /**
- * A mutable sequential list with O(1) whole-list splicing operations.
+ * A mutable, sequential {@link java.util.List} implementation with explicit
+ * O(1) whole-list splicing operations.
+ *
+ * <p>{@code SpliceList} behaves like a linked sequential list for ordinary
+ * {@link java.util.List} operations and additionally supports transferring the
+ * nodes of one {@code SpliceList} into another with {@link #spliceTail(SpliceList)}
+ * and {@link #spliceHead(SpliceList)}. Splicing is destructive to the source
+ * list: the transferred source is emptied after a successful splice.</p>
+ *
+ * <p>This class permits {@code null} elements. Instances are mutable and are not
+ * thread-safe.</p>
  *
  * @param <E> the element type
  */
@@ -22,11 +32,15 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Creates a splice list containing the supplied elements in order.
+     * Creates a splice list containing the supplied elements in encounter order.
+     *
+     * <p>The varargs array itself must not be {@code null}. Individual
+     * {@code null} elements are permitted and are stored in the returned list.</p>
      *
      * @param elements the elements to add
      * @param <E> the element type
      * @return a new splice list
+     * @throws NullPointerException if {@code elements} is {@code null}
      */
     @SafeVarargs
     public static <E> SpliceList<E> of(E... elements) {
@@ -40,9 +54,17 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Appends all nodes from {@code other} to this list in O(1), then empties {@code other}.
+     * Appends all elements from {@code other} to the end of this list in O(1) by
+     * transferring {@code other}'s internal nodes.
+     *
+     * <p>This operation is destructive to {@code other}. After a successful
+     * splice, this list contains the elements that were previously in
+     * {@code other}, and {@code other} is empty. If {@code other} is empty, both
+     * lists are left unchanged.</p>
      *
      * @param other the source list
+     * @throws NullPointerException if {@code other} is {@code null}
+     * @throws IllegalArgumentException if {@code other} is this list
      */
     public void spliceTail(SpliceList<E> other) {
         requireSpliceSource(other);
@@ -67,9 +89,17 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Prepends all nodes from {@code other} to this list in O(1), then empties {@code other}.
+     * Prepends all elements from {@code other} to the beginning of this list in
+     * O(1) by transferring {@code other}'s internal nodes.
+     *
+     * <p>This operation is destructive to {@code other}. After a successful
+     * splice, this list contains the elements that were previously in
+     * {@code other}, and {@code other} is empty. If {@code other} is empty, both
+     * lists are left unchanged.</p>
      *
      * @param other the source list
+     * @throws NullPointerException if {@code other} is {@code null}
+     * @throws IllegalArgumentException if {@code other} is this list
      */
     public void spliceHead(SpliceList<E> other) {
         requireSpliceSource(other);
@@ -96,6 +126,8 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     /**
      * Inserts {@code element} at the beginning of this list.
      *
+     * <p>{@code null} elements are permitted.</p>
+     *
      * @param element the element to add
      */
     public void addFirst(E element) {
@@ -105,6 +137,8 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     /**
      * Appends {@code element} to the end of this list.
      *
+     * <p>{@code null} elements are permitted.</p>
+     *
      * @param element the element to add
      */
     public void addLast(E element) {
@@ -112,9 +146,10 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Removes and returns the first element.
+     * Removes and returns the first element of this list.
      *
      * @return the removed element
+     * @throws NoSuchElementException if this list is empty
      */
     public E removeFirst() {
         Node<E> node = first;
@@ -125,9 +160,10 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Removes and returns the last element.
+     * Removes and returns the last element of this list.
      *
      * @return the removed element
+     * @throws NoSuchElementException if this list is empty
      */
     public E removeLast() {
         Node<E> node = last;
@@ -138,9 +174,10 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Returns the first element.
+     * Returns the first element of this list.
      *
      * @return the first element
+     * @throws NoSuchElementException if this list is empty
      */
     public E getFirst() {
         Node<E> node = first;
@@ -151,9 +188,10 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Returns the last element.
+     * Returns the last element of this list.
      *
      * @return the last element
+     * @throws NoSuchElementException if this list is empty
      */
     public E getLast() {
         Node<E> node = last;
@@ -163,11 +201,28 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
         return node.item;
     }
 
+    /**
+     * Returns the number of elements in this list.
+     *
+     * @return the number of elements in this list
+     */
     @Override
     public int size() {
         return size;
     }
 
+    /**
+     * Returns a list iterator positioned at the specified index.
+     *
+     * <p>The index identifies the element that would be returned by an initial
+     * call to {@link ListIterator#next()}. An index equal to {@link #size()} is
+     * permitted and returns an iterator positioned after the last element.</p>
+     *
+     * @param index the iterator's starting position
+     * @return a list iterator over this list's elements
+     * @throws IndexOutOfBoundsException if {@code index} is less than zero or
+     *         greater than {@code size()}
+     */
     @Override
     public ListIterator<E> listIterator(int index) {
         checkPositionIndex(index);

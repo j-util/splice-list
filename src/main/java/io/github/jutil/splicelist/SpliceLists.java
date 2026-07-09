@@ -13,8 +13,9 @@ public final class SpliceLists {
     /**
      * Returns a collector that accumulates stream elements into a new {@link SpliceList}.
      *
-     * <p>This collector is non-destructive: elements are added to the result list one by one
-     * and source collections are not modified.</p>
+     * <p>This collector is non-destructive. It adds each stream element to the
+     * result list one by one and does not modify any source collection or source
+     * {@code SpliceList} that supplied those elements.</p>
      *
      * @param <E> the element type
      * @return a collector into a new splice list
@@ -30,8 +31,9 @@ public final class SpliceLists {
      * Returns a collector that destructively concatenates input {@link SpliceList} instances
      * into a new {@link SpliceList}.
      *
-     * <p>This collector is destructive. Each non-null input list is spliced into the collected
-     * result with {@link SpliceList#spliceTail(SpliceList)} and is emptied by the collection
+     * <p>This collector is destructive to the input lists. Each non-null input
+     * list is spliced into the collected result with
+     * {@link SpliceList#spliceTail(SpliceList)} and is emptied by the collection
      * process. Null input lists are rejected with {@link NullPointerException}.</p>
      *
      * @param <E> the element type
