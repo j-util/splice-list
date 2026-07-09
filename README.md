@@ -1,5 +1,7 @@
 # splice-list
 
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.j-util/splice-list)](https://central.sonatype.com/artifact/io.github.j-util/splice-list)
+
 A List-compatible Java collection with explicit O(1) whole-list splicing.
 
 `SpliceList<E>` is a mutable, sequential Java list. It implements the standard
@@ -22,6 +24,18 @@ Use `addAll(Collection)` when you want normal `List` behavior:
   empty the source collection.
 - `spliceTail(SpliceList)` and `spliceHead(SpliceList)` transfer list structure
   and empty the source `SpliceList`.
+
+## Installation
+
+Add the Maven dependency:
+
+```xml
+<dependency>
+  <groupId>io.github.j-util</groupId>
+  <artifactId>splice-list</artifactId>
+  <version>1.0.0</version>
+</dependency>
+```
 
 ## Basic usage
 
