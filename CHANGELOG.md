@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 - 2026-07-09
 
 - Added the initial `SpliceList<E>` implementation, a mutable sequential list
   compatible with the Java `List` API.
