@@ -10,6 +10,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SpliceListsTest {
+    private static final int PARALLEL_ELEMENT_COUNT = 1000;
+    private static final int PARALLEL_LIST_COUNT = 128;
+    private static final int PARALLEL_LIST_SIZE = 4;
+
     @Test
     void toSpliceListCollectsElementsInOrder() {
         SpliceList<String> result = Arrays.asList("a", "b", "c")
@@ -30,6 +34,15 @@ class SpliceListsTest {
     }
 
     @Test
+    void toSpliceListCollectsParallelStreamElementsInOrder() {
+        ArrayList<Integer> source = range(PARALLEL_ELEMENT_COUNT);
+
+        SpliceList<Integer> result = source.parallelStream().collect(SpliceLists.toSpliceList());
+
+        assertEquals(source, result);
+    }
+
+    @Test
     void toSplicedListCombinesListsInOrder() {
         SpliceList<String> first = SpliceList.of("a", "b");
         SpliceList<String> second = SpliceList.of("c");
@@ -40,6 +53,16 @@ class SpliceListsTest {
                 .collect(SpliceLists.toSplicedList());
 
         assertEquals(Arrays.asList("a", "b", "c", "d", "e"), result);
+    }
+
+    @Test
+    void toSplicedListCombinesParallelStreamListsInOrder() {
+        ArrayList<SpliceList<Integer>> source = chunkedSpliceLists(PARALLEL_LIST_COUNT, PARALLEL_LIST_SIZE);
+        ArrayList<Integer> expected = range(PARALLEL_LIST_COUNT * PARALLEL_LIST_SIZE);
+
+        SpliceList<Integer> result = source.parallelStream().collect(SpliceLists.toSplicedList());
+
+        assertEquals(expected, result);
     }
 
     @Test
@@ -58,6 +81,17 @@ class SpliceListsTest {
     }
 
     @Test
+    void toSplicedListEmptiesAllParallelStreamInputLists() {
+        ArrayList<SpliceList<Integer>> source = chunkedSpliceLists(PARALLEL_LIST_COUNT, PARALLEL_LIST_SIZE);
+
+        source.parallelStream().collect(SpliceLists.toSplicedList());
+
+        for (SpliceList<Integer> list : source) {
+            assertTrue(list.isEmpty());
+        }
+    }
+
+    @Test
     void toSplicedListHandlesEmptyInputStream() {
         SpliceList<String> result = new ArrayList<SpliceList<String>>()
                 .stream()
@@ -71,5 +105,27 @@ class SpliceListsTest {
         assertThrows(NullPointerException.class, () -> Arrays.<SpliceList<String>>asList((SpliceList<String>) null)
                 .stream()
                 .collect(SpliceLists.toSplicedList()));
+    }
+
+    private static ArrayList<Integer> range(int size) {
+        ArrayList<Integer> values = new ArrayList<Integer>();
+        for (int i = 0; i < size; i++) {
+            values.add(Integer.valueOf(i));
+        }
+        return values;
+    }
+
+    private static ArrayList<SpliceList<Integer>> chunkedSpliceLists(int listCount, int listSize) {
+        ArrayList<SpliceList<Integer>> lists = new ArrayList<SpliceList<Integer>>();
+        int value = 0;
+        for (int i = 0; i < listCount; i++) {
+            SpliceList<Integer> list = new SpliceList<Integer>();
+            for (int j = 0; j < listSize; j++) {
+                list.addLast(Integer.valueOf(value));
+                value++;
+            }
+            lists.add(list);
+        }
+        return lists;
     }
 }
