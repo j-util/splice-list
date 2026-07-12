@@ -1,6 +1,7 @@
 # splice-list
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.j-util/splice-list)](https://central.sonatype.com/artifact/io.github.j-util/splice-list)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.j-util/splice-list)](https://central.sonatype.com/artifact/io.github.j-util/splice-list) 
+[![MvnRepository](https://badges.mvnrepository.com/badge/io.github.j-util/splice-list/badge.svg?label=MvnRepository&color=green)](https://mvnrepository.com/artifact/io.github.j-util/splice-list)
 
 A List-compatible Java collection with explicit O(1) whole-list splicing.
 
