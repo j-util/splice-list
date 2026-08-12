@@ -1,41 +1,72 @@
 package io.github.jutil.splicelist;
 
 import java.util.AbstractSequentialList;
+import java.util.Arrays;
+import java.util.ConcurrentModificationException;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
 /**
- * A mutable, sequential {@link java.util.List} implementation with explicit
- * O(1) whole-list splicing operations.
+ * A mutable, sequential {@link java.util.List} implementation with segmented
+ * storage and explicit O(1) whole-list splicing operations.
  *
- * <p>{@code SpliceList} behaves like a linked sequential list for ordinary
- * {@link java.util.List} operations and additionally supports transferring the
- * nodes of one {@code SpliceList} into another with {@link #spliceTail(SpliceList)}
- * and {@link #spliceHead(SpliceList)}. Splicing is destructive to the source
- * list: the transferred source is emptied after a successful splice.</p>
+ * <p>{@code SpliceList} stores elements in a doubly linked chain of array-backed
+ * segments. Ordinary endpoint additions use segments with the configured
+ * capacity, while indexed insertion may introduce smaller fragments. The
+ * segment size controls the tradeoff between the number of linked nodes and the
+ * bounded work and memory associated with an individual segment.</p>
+ *
+ * <p>{@link #spliceTail(SpliceList)} and {@link #spliceHead(SpliceList)} transfer
+ * the source list's segment chain without copying elements. Splicing is
+ * destructive to the source list: the transferred source is empty after a
+ * successful splice. Transferred segments keep their original capacities, even
+ * when the two lists have different configured segment sizes.</p>
  *
  * <p>This class permits {@code null} elements. Instances are mutable and are not
- * thread-safe.</p>
+ * thread-safe. Segments are not automatically compacted, merged, or rebalanced.</p>
  *
  * @param <E> the element type
  */
 public final class SpliceList<E> extends AbstractSequentialList<E> {
-    private Node<E> first;
-    private Node<E> last;
+    private static final int DEFAULT_SEGMENT_SIZE = 1024;
+
+    private final int segmentSize;
+    private Segment<E> first;
+    private Segment<E> last;
     private int size;
 
     /**
-     * Creates an empty splice list.
+     * Creates an empty splice list whose regular segments hold up to 1024
+     * elements.
      */
     public SpliceList() {
+        this(DEFAULT_SEGMENT_SIZE);
+    }
+
+    /**
+     * Creates an empty splice list with the requested regular segment capacity.
+     *
+     * <p>The configured size applies to regular segments subsequently created
+     * by this list. Segments received through a splice retain the source list's
+     * capacities.</p>
+     *
+     * @param segmentSize the capacity of regular segments
+     * @throws IllegalArgumentException if {@code segmentSize} is not positive
+     */
+    public SpliceList(int segmentSize) {
+        if (segmentSize <= 0) {
+            throw new IllegalArgumentException("segmentSize must be greater than zero");
+        }
+        this.segmentSize = segmentSize;
     }
 
     /**
      * Creates a splice list containing the supplied elements in encounter order.
      *
      * <p>The varargs array itself must not be {@code null}. Individual
-     * {@code null} elements are permitted and are stored in the returned list.</p>
+     * {@code null} elements are permitted and are stored in the returned list.
+     * The returned list uses the default regular segment size of 1024.</p>
      *
      * @param elements the elements to add
      * @param <E> the element type
@@ -55,12 +86,13 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
 
     /**
      * Appends all elements from {@code other} to the end of this list in O(1) by
-     * transferring {@code other}'s internal nodes.
+     * transferring {@code other}'s internal segments.
      *
      * <p>This operation is destructive to {@code other}. After a successful
      * splice, this list contains the elements that were previously in
      * {@code other}, and {@code other} is empty. If {@code other} is empty, both
-     * lists are left unchanged.</p>
+     * lists are left unchanged. Segment capacities are preserved; no boundary
+     * segments are copied, merged, or rebalanced.</p>
      *
      * @param other the source list
      * @throws NullPointerException if {@code other} is {@code null}
@@ -90,12 +122,13 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
 
     /**
      * Prepends all elements from {@code other} to the beginning of this list in
-     * O(1) by transferring {@code other}'s internal nodes.
+     * O(1) by transferring {@code other}'s internal segments.
      *
      * <p>This operation is destructive to {@code other}. After a successful
      * splice, this list contains the elements that were previously in
      * {@code other}, and {@code other} is empty. If {@code other} is empty, both
-     * lists are left unchanged.</p>
+     * lists are left unchanged. Segment capacities are preserved; no boundary
+     * segments are copied, merged, or rebalanced.</p>
      *
      * @param other the source list
      * @throws NullPointerException if {@code other} is {@code null}
@@ -124,7 +157,8 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Inserts {@code element} at the beginning of this list.
+     * Inserts {@code element} at the beginning of this list in amortized O(1)
+     * time.
      *
      * <p>{@code null} elements are permitted.</p>
      *
@@ -135,7 +169,7 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Appends {@code element} to the end of this list.
+     * Appends {@code element} to the end of this list in amortized O(1) time.
      *
      * <p>{@code null} elements are permitted.</p>
      *
@@ -146,31 +180,29 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
-     * Removes and returns the first element of this list.
+     * Removes and returns the first element of this list in O(1) time.
      *
      * @return the removed element
      * @throws NoSuchElementException if this list is empty
      */
     public E removeFirst() {
-        Node<E> node = first;
-        if (node == null) {
+        if (first == null) {
             throw new NoSuchElementException();
         }
-        return unlinkFirst(node);
+        return removeElement(first, 0);
     }
 
     /**
-     * Removes and returns the last element of this list.
+     * Removes and returns the last element of this list in O(1) time.
      *
      * @return the removed element
      * @throws NoSuchElementException if this list is empty
      */
     public E removeLast() {
-        Node<E> node = last;
-        if (node == null) {
+        if (last == null) {
             throw new NoSuchElementException();
         }
-        return unlinkLast(node);
+        return removeElement(last, last.length - 1);
     }
 
     /**
@@ -180,11 +212,10 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
      * @throws NoSuchElementException if this list is empty
      */
     public E getFirst() {
-        Node<E> node = first;
-        if (node == null) {
+        if (first == null) {
             throw new NoSuchElementException();
         }
-        return node.item;
+        return elementAt(first, 0);
     }
 
     /**
@@ -194,11 +225,10 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
      * @throws NoSuchElementException if this list is empty
      */
     public E getLast() {
-        Node<E> node = last;
-        if (node == null) {
+        if (last == null) {
             throw new NoSuchElementException();
         }
-        return node.item;
+        return elementAt(last, last.length - 1);
     }
 
     /**
@@ -209,6 +239,64 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     @Override
     public int size() {
         return size;
+    }
+
+    @Override
+    public E get(int index) {
+        checkElementIndex(index);
+        Position<E> position = position(index);
+        return elementAt(position.segment, position.offset);
+    }
+
+    @Override
+    public E set(int index, E element) {
+        checkElementIndex(index);
+        Position<E> position = position(index);
+        return setElement(position.segment, position.offset, element);
+    }
+
+    @Override
+    public void add(int index, E element) {
+        checkPositionIndex(index);
+        if (index == size) {
+            linkLast(element);
+        } else if (index == 0) {
+            linkFirst(element);
+        } else {
+            Position<E> position = position(index);
+            insertBefore(element, position.segment, position.offset);
+        }
+    }
+
+    @Override
+    public E remove(int index) {
+        checkElementIndex(index);
+        Position<E> position = position(index);
+        return removeElement(position.segment, position.offset);
+    }
+
+    /**
+     * Removes every element from this list. The configured segment size is
+     * retained for subsequent additions.
+     */
+    @Override
+    public void clear() {
+        if (size == 0) {
+            return;
+        }
+
+        Segment<E> segment = first;
+        while (segment != null) {
+            Segment<E> next = segment.next;
+            Arrays.fill(segment.elements, segment.start, segment.start + segment.length, null);
+            segment.previous = null;
+            segment.next = null;
+            segment = next;
+        }
+        first = null;
+        last = null;
+        size = 0;
+        modCount++;
     }
 
     /**
@@ -243,115 +331,200 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     private void linkFirst(E element) {
-        Node<E> oldFirst = first;
-        Node<E> newNode = new Node<E>(null, element, oldFirst);
-        first = newNode;
-        if (oldFirst == null) {
-            last = newNode;
+        if (first != null && first.start > 0) {
+            first.start--;
+            first.elements[first.start] = element;
+            first.length++;
         } else {
-            oldFirst.previous = newNode;
+            Segment<E> segment = regularSegment(element, segmentSize - 1);
+            Segment<E> oldFirst = first;
+            segment.next = oldFirst;
+            first = segment;
+            if (oldFirst == null) {
+                last = segment;
+            } else {
+                oldFirst.previous = segment;
+            }
         }
         size++;
         modCount++;
     }
 
     private void linkLast(E element) {
-        Node<E> oldLast = last;
-        Node<E> newNode = new Node<E>(oldLast, element, null);
-        last = newNode;
-        if (oldLast == null) {
-            first = newNode;
+        if (last != null && last.start + last.length < last.elements.length) {
+            last.elements[last.start + last.length] = element;
+            last.length++;
         } else {
-            oldLast.next = newNode;
+            Segment<E> segment = regularSegment(element, 0);
+            Segment<E> oldLast = last;
+            segment.previous = oldLast;
+            last = segment;
+            if (oldLast == null) {
+                first = segment;
+            } else {
+                oldLast.next = segment;
+            }
         }
         size++;
         modCount++;
     }
 
-    private void linkBefore(E element, Node<E> successor) {
-        Node<E> predecessor = successor.previous;
-        Node<E> newNode = new Node<E>(predecessor, element, successor);
-        successor.previous = newNode;
+    private Segment<E> regularSegment(E element, int start) {
+        Object[] elements = new Object[segmentSize];
+        elements[start] = element;
+        return new Segment<E>(elements, start, 1);
+    }
+
+    private Segment<E> insertBefore(E element, Segment<E> successor, int offset) {
+        if (offset == 0) {
+            Segment<E> singleton = singletonSegment(element);
+            linkSegmentBefore(singleton, successor);
+            size++;
+            modCount++;
+            return successor;
+        }
+
+        int suffixLength = successor.length - offset;
+        Object[] suffixElements = new Object[suffixLength];
+        System.arraycopy(
+                successor.elements,
+                successor.start + offset,
+                suffixElements,
+                0,
+                suffixLength);
+        Segment<E> singleton = singletonSegment(element);
+        Segment<E> suffix = new Segment<E>(suffixElements, 0, suffixLength);
+
+        Arrays.fill(
+                successor.elements,
+                successor.start + offset,
+                successor.start + successor.length,
+                null);
+
+        Segment<E> oldNext = successor.next;
+        successor.length = offset;
+
+        successor.next = singleton;
+        singleton.previous = successor;
+        singleton.next = suffix;
+        suffix.previous = singleton;
+        suffix.next = oldNext;
+        if (oldNext == null) {
+            last = suffix;
+        } else {
+            oldNext.previous = suffix;
+        }
+
+        size++;
+        modCount++;
+        return suffix;
+    }
+
+    private Segment<E> singletonSegment(E element) {
+        Object[] elements = new Object[1];
+        elements[0] = element;
+        return new Segment<E>(elements, 0, 1);
+    }
+
+    private void linkSegmentBefore(Segment<E> segment, Segment<E> successor) {
+        Segment<E> predecessor = successor.previous;
+        segment.previous = predecessor;
+        segment.next = successor;
+        successor.previous = segment;
         if (predecessor == null) {
-            first = newNode;
+            first = segment;
         } else {
-            predecessor.next = newNode;
+            predecessor.next = segment;
         }
-        size++;
-        modCount++;
     }
 
-    private E unlinkFirst(Node<E> node) {
-        E element = node.item;
-        Node<E> next = node.next;
-        node.item = null;
-        node.next = null;
-        first = next;
-        if (next == null) {
-            last = null;
+    private E removeElement(Segment<E> segment, int offset) {
+        E element = elementAt(segment, offset);
+        if (segment.length == 1) {
+            segment.elements[segment.start] = null;
+            unlinkSegment(segment);
         } else {
-            next.previous = null;
+            int prefixLength = offset;
+            int suffixLength = segment.length - offset - 1;
+            if (prefixLength < suffixLength) {
+                System.arraycopy(
+                        segment.elements,
+                        segment.start,
+                        segment.elements,
+                        segment.start + 1,
+                        prefixLength);
+                segment.elements[segment.start] = null;
+                segment.start++;
+            } else {
+                System.arraycopy(
+                        segment.elements,
+                        segment.start + offset + 1,
+                        segment.elements,
+                        segment.start + offset,
+                        suffixLength);
+                segment.elements[segment.start + segment.length - 1] = null;
+            }
+            segment.length--;
         }
         size--;
         modCount++;
         return element;
     }
 
-    private E unlinkLast(Node<E> node) {
-        E element = node.item;
-        Node<E> previous = node.previous;
-        node.item = null;
-        node.previous = null;
-        last = previous;
-        if (previous == null) {
-            first = null;
-        } else {
-            previous.next = null;
-        }
-        size--;
-        modCount++;
-        return element;
-    }
-
-    private E unlink(Node<E> node) {
-        E element = node.item;
-        Node<E> previous = node.previous;
-        Node<E> next = node.next;
-
+    private void unlinkSegment(Segment<E> segment) {
+        Segment<E> previous = segment.previous;
+        Segment<E> next = segment.next;
         if (previous == null) {
             first = next;
         } else {
             previous.next = next;
-            node.previous = null;
         }
-
         if (next == null) {
             last = previous;
         } else {
             next.previous = previous;
-            node.next = null;
         }
-
-        node.item = null;
-        size--;
-        modCount++;
-        return element;
+        segment.previous = null;
+        segment.next = null;
     }
 
-    private Node<E> node(int index) {
+    @SuppressWarnings("unchecked")
+    private E elementAt(Segment<E> segment, int offset) {
+        return (E) segment.elements[segment.start + offset];
+    }
+
+    private E setElement(Segment<E> segment, int offset, E element) {
+        int arrayIndex = segment.start + offset;
+        @SuppressWarnings("unchecked")
+        E previous = (E) segment.elements[arrayIndex];
+        segment.elements[arrayIndex] = element;
+        return previous;
+    }
+
+    private Position<E> position(int index) {
         if (index < (size >> 1)) {
-            Node<E> node = first;
-            for (int i = 0; i < index; i++) {
-                node = node.next;
+            int remaining = index;
+            Segment<E> segment = first;
+            while (remaining >= segment.length) {
+                remaining -= segment.length;
+                segment = segment.next;
             }
-            return node;
+            return new Position<E>(segment, remaining);
         }
 
-        Node<E> node = last;
-        for (int i = size - 1; i > index; i--) {
-            node = node.previous;
+        int remaining = size - 1 - index;
+        Segment<E> segment = last;
+        while (remaining >= segment.length) {
+            remaining -= segment.length;
+            segment = segment.previous;
         }
-        return node;
+        return new Position<E>(segment, segment.length - 1 - remaining);
+    }
+
+    private void checkElementIndex(int index) {
+        if (index < 0 || index >= size) {
+            throw new IndexOutOfBoundsException(outOfBoundsMessage(index));
+        }
     }
 
     private void checkPositionIndex(int index) {
@@ -364,26 +537,45 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
         return "Index: " + index + ", Size: " + size;
     }
 
-    private static final class Node<E> {
-        private Node<E> previous;
-        private E item;
-        private Node<E> next;
+    private static final class Segment<E> {
+        private final Object[] elements;
+        private int start;
+        private int length;
+        private Segment<E> previous;
+        private Segment<E> next;
 
-        private Node(Node<E> previous, E item, Node<E> next) {
-            this.previous = previous;
-            this.item = item;
-            this.next = next;
+        private Segment(Object[] elements, int start, int length) {
+            this.elements = elements;
+            this.start = start;
+            this.length = length;
+        }
+    }
+
+    private static final class Position<E> {
+        private final Segment<E> segment;
+        private final int offset;
+
+        private Position(Segment<E> segment, int offset) {
+            this.segment = segment;
+            this.offset = offset;
         }
     }
 
     private final class SpliceListIterator implements ListIterator<E> {
-        private Node<E> lastReturned;
-        private Node<E> next;
+        private Segment<E> lastReturnedSegment;
+        private int lastReturnedOffset;
+        private boolean lastMoveWasNext;
+        private Segment<E> nextSegment;
+        private int nextOffset;
         private int nextIndex;
         private int expectedModCount = modCount;
 
         private SpliceListIterator(int index) {
-            next = index == size ? null : node(index);
+            if (index < size) {
+                Position<E> position = position(index);
+                nextSegment = position.segment;
+                nextOffset = position.offset;
+            }
             nextIndex = index;
         }
 
@@ -399,10 +591,13 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
                 throw new NoSuchElementException();
             }
 
-            lastReturned = next;
-            next = next.next;
+            lastReturnedSegment = nextSegment;
+            lastReturnedOffset = nextOffset;
+            lastMoveWasNext = true;
+            E element = elementAt(nextSegment, nextOffset);
+            advanceNextCursor();
             nextIndex++;
-            return lastReturned.item;
+            return element;
         }
 
         @Override
@@ -417,10 +612,20 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
                 throw new NoSuchElementException();
             }
 
-            next = next == null ? last : next.previous;
-            lastReturned = next;
+            if (nextSegment == null) {
+                nextSegment = last;
+                nextOffset = last.length - 1;
+            } else if (nextOffset > 0) {
+                nextOffset--;
+            } else {
+                nextSegment = nextSegment.previous;
+                nextOffset = nextSegment.length - 1;
+            }
             nextIndex--;
-            return lastReturned.item;
+            lastReturnedSegment = nextSegment;
+            lastReturnedOffset = nextOffset;
+            lastMoveWasNext = false;
+            return elementAt(nextSegment, nextOffset);
         }
 
         @Override
@@ -436,46 +641,77 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
         @Override
         public void remove() {
             checkForComodification();
-            if (lastReturned == null) {
+            if (lastReturnedSegment == null) {
                 throw new IllegalStateException();
             }
 
-            Node<E> lastNext = lastReturned.next;
-            unlink(lastReturned);
-            if (next == lastReturned) {
-                next = lastNext;
+            Segment<E> removedFrom = lastReturnedSegment;
+            Segment<E> followingSegment = removedFrom.next;
+            int removedOffset = lastReturnedOffset;
+            boolean unlinked = removedFrom.length == 1;
+            removeElement(removedFrom, removedOffset);
+
+            if (!unlinked) {
+                if (removedOffset < removedFrom.length) {
+                    nextSegment = removedFrom;
+                    nextOffset = removedOffset;
+                } else {
+                    nextSegment = followingSegment;
+                    nextOffset = 0;
+                }
             } else {
+                nextSegment = followingSegment;
+                nextOffset = 0;
+            }
+            if (lastMoveWasNext) {
                 nextIndex--;
             }
-            lastReturned = null;
-            expectedModCount++;
+            lastReturnedSegment = null;
+            expectedModCount = modCount;
         }
 
         @Override
         public void set(E element) {
-            if (lastReturned == null) {
+            if (lastReturnedSegment == null) {
                 throw new IllegalStateException();
             }
             checkForComodification();
-            lastReturned.item = element;
+            setElement(lastReturnedSegment, lastReturnedOffset, element);
         }
 
         @Override
         public void add(E element) {
             checkForComodification();
-            lastReturned = null;
-            if (next == null) {
+
+            if (nextIndex == size) {
                 linkLast(element);
+            } else if (nextIndex == 0) {
+                Segment<E> oldFirst = first;
+                boolean reusedFirst = oldFirst.start > 0;
+                linkFirst(element);
+                nextSegment = oldFirst;
+                nextOffset = reusedFirst ? 1 : 0;
             } else {
-                linkBefore(element, next);
+                nextSegment = insertBefore(element, nextSegment, nextOffset);
+                nextOffset = 0;
             }
+            lastReturnedSegment = null;
             nextIndex++;
-            expectedModCount++;
+            expectedModCount = modCount;
+        }
+
+        private void advanceNextCursor() {
+            if (nextOffset + 1 < nextSegment.length) {
+                nextOffset++;
+            } else {
+                nextSegment = nextSegment.next;
+                nextOffset = 0;
+            }
         }
 
         private void checkForComodification() {
             if (modCount != expectedModCount) {
-                throw new java.util.ConcurrentModificationException();
+                throw new ConcurrentModificationException();
             }
         }
     }
