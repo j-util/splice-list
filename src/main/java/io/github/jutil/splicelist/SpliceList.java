@@ -3,6 +3,7 @@ package io.github.jutil.splicelist;
 import java.util.AbstractSequentialList;
 import java.util.Arrays;
 import java.util.ConcurrentModificationException;
+import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -300,6 +301,28 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
     }
 
     /**
+     * Returns an iterator over this list's elements in encounter order.
+     *
+     * <p>The iterator supports removal of the last element returned by
+     * {@link Iterator#next()}, once per successful call to {@code next}. On a
+     * best-effort basis, it throws {@link ConcurrentModificationException} if
+     * the list is structurally modified after the iterator is created, except
+     * through the iterator's own {@link Iterator#remove()} method. Replacing an
+     * element through {@link #set(int, Object)} is non-structural, does not
+     * invalidate the iterator, and is visible if the element has not yet been
+     * returned.</p>
+     *
+     * <p>Traversing {@code n} elements takes O(n) time. The iterator uses O(1)
+     * additional space.</p>
+     *
+     * @return an iterator over this list's elements
+     */
+    @Override
+    public Iterator<E> iterator() {
+        return new ForwardIterator();
+    }
+
+    /**
      * Returns a list iterator positioned at the specified index.
      *
      * <p>The index identifies the element that would be returned by an initial
@@ -558,6 +581,99 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
         private Position(Segment<E> segment, int offset) {
             this.segment = segment;
             this.offset = offset;
+        }
+    }
+
+    private final class ForwardIterator implements Iterator<E> {
+        private Segment<E> segment;
+        private Object[] elements;
+        private int arrayIndex;
+        private int arrayFence;
+        private int remaining = size;
+        private int lastReturnedArrayIndex = -1;
+        private int expectedModCount = modCount;
+
+        ForwardIterator() {
+            Segment<E> firstSegment = first;
+            segment = firstSegment;
+            if (firstSegment != null) {
+                elements = firstSegment.elements;
+                arrayIndex = firstSegment.start;
+                arrayFence = firstSegment.start + firstSegment.length;
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+            return remaining > 0;
+        }
+
+        @Override
+        public E next() {
+            checkForComodification();
+            if (remaining == 0) {
+                throw new NoSuchElementException();
+            }
+
+            Segment<E> currentSegment = segment;
+            int currentArrayIndex = arrayIndex;
+            if (currentArrayIndex == arrayFence) {
+                currentSegment = currentSegment.next;
+                segment = currentSegment;
+                elements = currentSegment.elements;
+                currentArrayIndex = currentSegment.start;
+                arrayFence = currentArrayIndex + currentSegment.length;
+            }
+
+            @SuppressWarnings("unchecked")
+            E element = (E) elements[currentArrayIndex];
+            lastReturnedArrayIndex = currentArrayIndex;
+            arrayIndex = currentArrayIndex + 1;
+            remaining--;
+            return element;
+        }
+
+        @Override
+        public void remove() {
+            checkForComodification();
+            int removedArrayIndex = lastReturnedArrayIndex;
+            if (removedArrayIndex < 0) {
+                throw new IllegalStateException();
+            }
+
+            Segment<E> removedFrom = segment;
+            int removedOffset = removedArrayIndex - removedFrom.start;
+            Segment<E> followingSegment = removedFrom.next;
+            boolean unlinked = removedFrom.length == 1;
+            removeElement(removedFrom, removedOffset);
+
+            if (!unlinked) {
+                moveTo(removedFrom);
+                arrayIndex += removedOffset;
+            } else {
+                moveTo(followingSegment);
+            }
+            lastReturnedArrayIndex = -1;
+            expectedModCount = modCount;
+        }
+
+        private void moveTo(Segment<E> newSegment) {
+            segment = newSegment;
+            if (newSegment == null) {
+                elements = null;
+                arrayIndex = 0;
+                arrayFence = 0;
+            } else {
+                elements = newSegment.elements;
+                arrayIndex = newSegment.start;
+                arrayFence = newSegment.start + newSegment.length;
+            }
+        }
+
+        private void checkForComodification() {
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+            }
         }
     }
 

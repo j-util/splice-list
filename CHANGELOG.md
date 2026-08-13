@@ -12,6 +12,8 @@
   configuration for reuse.
 - Reworked indexed insertion, removal, and iteration for segmented and
   fragmented storage without automatic cross-segment rebalancing.
+- Optimized ordinary forward iteration with a dedicated fail-fast iterator
+  while preserving removal across segmented and fragmented storage.
 - Expanded public-contract coverage across small segment sizes, mixed-size
   splicing, iterator mutation, and deterministic randomized operations.
 - Documented the segmented architecture, segment-size tradeoffs, complexity
