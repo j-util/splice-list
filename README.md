@@ -55,9 +55,11 @@ Add the Maven dependency:
 <dependency>
   <groupId>io.github.j-util</groupId>
   <artifactId>splice-list</artifactId>
-  <version>1.0.0</version>
+  <version>2.0.0</version>
 </dependency>
 ```
+
+Java 8 or later is required.
 
 ## Basic usage
 
@@ -206,9 +208,10 @@ claimed.
 - A splice can leave the target with heterogeneous segment capacities. Its
   configured segment size applies only when it creates future regular segments.
 - Instances are mutable and are not thread-safe.
+- `SpliceList` does not currently implement `java.io.Serializable`.
 - `toSplicedList` is destructive: it empties every input `SpliceList` that it
   collects.
 - There are no benchmark claims yet.
 
 `SpliceList` is intended for cases where explicit whole-list transfer is useful
-and the linked-list access model is acceptable.
+and the segment-chain access model is acceptable.

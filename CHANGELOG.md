@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 2.0.0 - 2026-08-17
+
+Compatibility note: Existing 1.0.0 public methods remain available, and the new
+`SpliceList(int segmentSize)` constructor is additive, so no source-code
+migration is expected. Storage changed from one node per element to array-backed
+segments; endpoint additions are now amortized O(1), rather than the strict O(1)
+guarantee documented by 1.0.0.
 
 - Replaced one-node-per-element storage with a doubly linked chain of
   array-backed segments.
