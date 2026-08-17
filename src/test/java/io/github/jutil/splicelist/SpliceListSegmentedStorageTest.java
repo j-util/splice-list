@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
@@ -205,6 +206,26 @@ class SpliceListSegmentedStorageTest {
         SpliceList<Integer> fromEnd = segmentedList(3, 0, 1, 2, 3, 4, 5);
         assertEquals(Integer.valueOf(2), fromEnd.remove(2));
         assertEquals(Arrays.asList(0, 1, 3, 4, 5), fromEnd);
+    }
+
+    @Test
+    void repeatedIndexedHeadRemovalUnlinksExhaustedFirstSegmentAndListRemainsReusable() {
+        ArrayList<Integer> expected = range(12);
+        SpliceList<Integer> actual = new SpliceList<Integer>(5);
+        actual.addAll(expected);
+
+        for (int removal = 0; removal < 6; removal++) {
+            assertEquals(expected.remove(0), actual.remove(0));
+            assertEquals(expected, actual);
+        }
+
+        expected.add(0, Integer.valueOf(-1));
+        actual.addFirst(Integer.valueOf(-1));
+        assertEquals(expected, actual);
+
+        expected.add(Integer.valueOf(12));
+        actual.addLast(Integer.valueOf(12));
+        assertEquals(expected, actual);
     }
 
     @Test
@@ -433,6 +454,29 @@ class SpliceListSegmentedStorageTest {
         assertTrue(newHead.isEmpty());
         newHead.addFirst(Integer.valueOf(9));
         assertEquals(Arrays.asList(9), newHead);
+    }
+
+    @Test
+    void sortMatchesArrayListAcrossFragmentedMixedCapacitySplicedSegments() {
+        SpliceList<Integer> actual = segmentedList(2, 7, null, 3, 9);
+        actual.add(1, Integer.valueOf(5));
+        actual.add(3, Integer.valueOf(4));
+        SpliceList<Integer> source = segmentedList(3, 8, 1, 6, 2);
+        actual.spliceTail(source);
+        ArrayList<Integer> expected = new ArrayList<Integer>(actual);
+        Comparator<Integer> comparator = Comparator.nullsFirst(Comparator.<Integer>naturalOrder());
+
+        expected.sort(comparator);
+        actual.sort(comparator);
+
+        assertEquals(expected, actual);
+        assertTrue(source.isEmpty());
+
+        expected.add(0, Integer.valueOf(-1));
+        actual.addFirst(Integer.valueOf(-1));
+        expected.add(Integer.valueOf(10));
+        actual.addLast(Integer.valueOf(10));
+        assertEquals(expected, actual);
     }
 
     @Test

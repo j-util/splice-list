@@ -2,6 +2,7 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.j-util/splice-list)](https://central.sonatype.com/artifact/io.github.j-util/splice-list) 
 [![Javadoc](https://javadoc.io/badge2/io.github.j-util/splice-list/javadoc.svg)](https://javadoc.io/doc/io.github.j-util/splice-list)
+[![CI](https://github.com/j-util/splice-list/actions/workflows/ci.yml/badge.svg)](https://github.com/j-util/splice-list/actions/workflows/ci.yml)
 
 A List-compatible Java collection with explicit O(1) whole-list splicing.
 
@@ -146,6 +147,19 @@ SpliceList<String> result = java.util.Arrays.asList(first, second, third)
 // result is ["a", "b", "c", "d", "e"]
 // first, second, and third are now empty
 ```
+
+## Verification
+
+Standard mutable `List` behavior is regression-tested in CI using
+[Guava Testlib's `ListTestSuiteBuilder`](https://github.com/google/guava/tree/master/guava-testlib).
+[`SpliceListContractTest`](src/test/java/io/github/jutil/splicelist/SpliceListContractTest.java)
+runs the generated suites for the default segment size and segment sizes `1`,
+`2`, and `3`.
+
+Dedicated project tests cover segment boundaries, fragmented and mixed-capacity
+spliced layouts, custom splice and endpoint operations, collectors, and
+deterministic differential testing against `ArrayList`. Guava Testlib is
+test-scoped and adds no runtime dependency for consumers.
 
 ## Complexity
 

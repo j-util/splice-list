@@ -14,8 +14,9 @@
   fragmented storage without automatic cross-segment rebalancing.
 - Optimized ordinary forward iteration with a dedicated fail-fast iterator
   while preserving removal across segmented and fragmented storage.
-- Expanded public-contract coverage across small segment sizes, mixed-size
-  splicing, iterator mutation, and deterministic randomized operations.
+- Expanded test coverage with Guava Testlib-generated `List` contract suites
+  for the default segment size and sizes `1`, `2`, and `3`, plus focused
+  segment/splice tests and deterministic `ArrayList` differential tests.
 - Documented the segmented architecture, segment-size tradeoffs, complexity
   bounds, and fragmentation limitations.
 - Documented Maven installation instructions in the README.
