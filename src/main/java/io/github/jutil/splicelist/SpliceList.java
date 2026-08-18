@@ -175,6 +175,20 @@ public final class SpliceList<E> extends AbstractSequentialList<E> {
      * <p>{@code null} elements are permitted.</p>
      *
      * @param element the element to add
+     * @return {@code true}
+     */
+    @Override
+    public boolean add(E element) {
+        linkLast(element);
+        return true;
+    }
+
+    /**
+     * Appends {@code element} to the end of this list in amortized O(1) time.
+     *
+     * <p>{@code null} elements are permitted.</p>
+     *
+     * @param element the element to add
      */
     public void addLast(E element) {
         linkLast(element);

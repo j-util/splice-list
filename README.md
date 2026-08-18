@@ -171,6 +171,7 @@ to reach an index, and `c` the capacity of the segment containing that index.
 | Operation | Complexity |
 | --- | --- |
 | `addFirst` | amortized O(1) |
+| `add(E)` | amortized O(1) |
 | `addLast` | amortized O(1) |
 | `removeFirst` | O(1) |
 | `removeLast` | O(1) |

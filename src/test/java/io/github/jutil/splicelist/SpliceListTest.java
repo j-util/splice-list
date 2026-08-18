@@ -44,6 +44,21 @@ class SpliceListTest {
     }
 
     @Test
+    void addReturnsTrueAppendsNullAcrossSegmentBoundaryAndInvalidatesIterator() {
+        SpliceList<String> list = new SpliceList<String>(2);
+
+        assertTrue(list.add("a"));
+        assertTrue(list.add("b"));
+        Iterator<String> iterator = list.iterator();
+
+        assertTrue(list.add(null));
+
+        assertEquals(Arrays.asList("a", "b", null), list);
+        assertNull(list.get(2));
+        assertThrows(ConcurrentModificationException.class, iterator::next);
+    }
+
+    @Test
     void removeFirstAndRemoveLastReturnElementsAndShrinkList() {
         SpliceList<String> list = SpliceList.of("a", "b", "c");
 

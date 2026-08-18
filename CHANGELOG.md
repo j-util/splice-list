@@ -20,6 +20,8 @@ guarantee documented by 1.0.0.
   fragmented storage without automatic cross-segment rebalancing.
 - Optimized ordinary forward iteration with a dedicated fail-fast iterator
   while preserving removal across segmented and fragmented storage.
+- Optimized standard `List.add(E)` to use the same amortized O(1) append path as
+  `addLast(E)`.
 - Expanded test coverage with Guava Testlib-generated `List` contract suites
   for the default segment size and sizes `1`, `2`, and `3`, plus focused
   segment/splice tests and deterministic `ArrayList` differential tests.
