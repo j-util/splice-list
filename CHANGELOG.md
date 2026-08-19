@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0 - 2026-08-18
+## 2.0.0 - 2026-08-19
 
 Compatibility note: Existing 1.0.0 public methods remain available, and the new
 `SpliceList(int segmentSize)` constructor is additive, so no source-code
