@@ -199,20 +199,9 @@ visited by indexed lookup. The best choice depends on the expected mix of
 endpoint operations, indexed operations, and splicing; no universal optimum is
 claimed.
 
-## Limitations
+## Thread safety and serialization
 
-- `SpliceList` is not a faster `ArrayList`.
-- Indexed access requires segment traversal and remains O(n) in the worst
-  fragmented case, even though the list is `List` compatible.
-- Middle insertions can create singleton and partially occupied segments. There
-  is no automatic cross-segment compaction, merging, or rebalancing.
-- A splice can leave the target with heterogeneous segment capacities. Its
-  configured segment size applies only when it creates future regular segments.
-- Instances are mutable and are not thread-safe.
-- `SpliceList` does not currently implement `java.io.Serializable`.
-- `toSplicedList` is destructive: it empties every input `SpliceList` that it
-  collects.
-- There are no benchmark claims yet.
+`SpliceList` is mutable and not thread-safe. Concurrent access involving
+mutation requires external synchronization.
 
-`SpliceList` is intended for cases where explicit whole-list transfer is useful
-and the segment-chain access model is acceptable.
+`SpliceList` does not implement `java.io.Serializable`.
