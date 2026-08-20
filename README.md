@@ -51,6 +51,9 @@ Use `addAll(Collection)` when you want normal `List` behavior:
 
 Add the Maven dependency:
 
+The artifact is available on
+[Maven Central](https://central.sonatype.com/artifact/io.github.j-util/splice-list).
+
 ```xml
 <dependency>
   <groupId>io.github.j-util</groupId>
